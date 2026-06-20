@@ -382,11 +382,13 @@ const SPOTIFY_MARKETS = {
 
 async function spotifyGetTopTracks(cityId){
   const market = SPOTIFY_MARKETS[cityId]||'US';
+  const countryName = getCountryName(market);
   // Try multiple search queries to find official charts
   const queries = [
-    `Top 50 - ${market}`,
-    `Top Songs - ${market}`,
-    `Hot Hits ${getCountryName(market)}`,
+    `Top 50 - ${countryName}`,
+    `Top Songs - ${countryName}`,
+    `Hot Hits ${countryName}`,
+    `${countryName} Top 50`,
     `Today's Top Hits`,
   ];
   for(const q of queries){
