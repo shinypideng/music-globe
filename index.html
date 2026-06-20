@@ -390,6 +390,9 @@ async function spotifyGetTopTracks(cityId){
     `Hot Hits ${countryName}`,
     `${countryName} Top 50`,
     `Today's Top Hits`,
+    // Broad fallbacks
+    'Top Hits',
+    'Global Top 50',
   ];
   for(const q of queries){
     const result = await spotifyFetch(`/search?q=${encodeURIComponent(q)}&type=playlist&market=${market}&limit=5`);
