@@ -344,6 +344,7 @@ async function generateCodeChallenge(verifier){
 }
 
 async function spotifyLogin(){
+  try {
   if(currentCity) localStorage.setItem('last_city', currentCity.id);
   const verifier = generateCodeVerifier();
   localStorage.setItem('spotify_verifier', verifier);
@@ -357,7 +358,9 @@ async function spotifyLogin(){
     scope: 'user-read-private',
   });
   window.location.href = 'https://accounts.spotify.com/authorize?' + params;
+  } catch(e) { alert('Spotify 登录失败: ' + e.message); console.error(e); }
 }
+window.spotifyLogin = spotifyLogin;
 
 async function spotifyHandleCallback(){
   const code = new URLSearchParams(window.location.search).get('code');
