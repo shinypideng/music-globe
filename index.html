@@ -120,6 +120,16 @@ body{
 
 <div class="hint-badge" id="hint-badge">🌍 旋转地球 · 点击城市光点</div>
 
+<!-- Spotify Connect Button -->
+<div id="spotify-connect" style="position:fixed;top:20px;left:20px;z-index:99;display:flex;align-items:center;gap:8px;padding:8px 16px;background:rgba(30,215,96,.15);border:1px solid rgba(30,215,96,.3);border-radius:24px;cursor:pointer;transition:all .3s" onclick="spotifyLogin()">
+  <span style="font-size:16px">🟢</span>
+  <span style="color:#1ed760;font-size:12px;font-weight:600">Connect Spotify</span>
+</div>
+<div id="spotify-connected" style="position:fixed;top:20px;left:20px;z-index:99;display:none;align-items:center;gap:8px;padding:8px 16px;background:rgba(30,215,96,.08);border:1px solid rgba(30,215,96,.15);border-radius:24px;transition:all .3s">
+  <span style="font-size:14px">✅</span>
+  <span style="color:#1ed760;font-size:12px;font-weight:600">Spotify 已连接</span>
+</div>
+
 <script src="https://unpkg.com/three@0.140.0/build/three.min.js"></script>
 <script src="https://unpkg.com/globe.gl@2.32.4/dist/globe.gl.min.js"></script>
 
@@ -319,7 +329,100 @@ function removeLighthouse(){
   if(lighthouseAnimId){cancelAnimationFrame(lighthouseAnimId);lighthouseAnimId=null}
 }
 
-// ═══════════════ 播放器 ═══════════════
+// ═══════════════ Spotify OAuth (PKCE) ═══════════════
+const SPOTIFY_CLIENT_ID = '1f6545fb0837407cb6181f50d8a4cd71';
+const SPOTIFY_REDIRECT = 'https://shinypideng.github.io/music-globe/';
+let spotifyToken = localStorage.getItem('spotify_token') || null;
+
+function generateCodeVerifier(){
+  const arr = new Uint8Array(64); crypto.getRandomValues(arr);
+  return btoa(String.fromCharCode(...arr)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'').substring(0,128);
+}
+async function generateCodeChallenge(verifier){
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+
+async function spotifyLogin(){
+  if(currentCity) localStorage.setItem('last_city', currentCity.id);
+  const verifier = generateCodeVerifier();
+  localStorage.setItem('spotify_verifier', verifier);
+  const challenge = await generateCodeChallenge(verifier);
+  const params = new URLSearchParams({
+    client_id: SPOTIFY_CLIENT_ID,
+    response_type: 'code',
+    redirect_uri: SPOTIFY_REDIRECT,
+    code_challenge_method: 'S256',
+    code_challenge: challenge,
+    scope: 'user-read-private',
+  });
+  window.location.href = 'https://accounts.spotify.com/authorize?' + params;
+}
+
+async function spotifyHandleCallback(){
+  const code = new URLSearchParams(window.location.search).get('code');
+  if(!code) return false;
+  // Clean URL
+  window.history.replaceState({}, '', SPOTIFY_REDIRECT);
+  const verifier = localStorage.getItem('spotify_verifier');
+  const resp = await fetch('https://accounts.spotify.com/api/token', {
+    method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body: new URLSearchParams({
+      client_id: SPOTIFY_CLIENT_ID,
+      grant_type: 'authorization_code',
+      code, redirect_uri: SPOTIFY_REDIRECT,
+      code_verifier: verifier,
+    })
+  });
+  const data = await resp.json();
+  if(data.access_token){
+    spotifyToken = data.access_token;
+    localStorage.setItem('spotify_token', spotifyToken);
+    localStorage.setItem('spotify_expires', Date.now() + (data.expires_in||3600)*1000);
+    return true;
+  }
+  return false;
+}
+
+async function spotifyFetch(endpoint){
+  if(!spotifyToken) return null;
+  // Check expiry
+  const exp = localStorage.getItem('spotify_expires');
+  if(exp && Date.now() > parseInt(exp)){ spotifyToken=null; localStorage.removeItem('spotify_token'); return null; }
+  try{
+    const r = await fetch('https://api.spotify.com/v1'+endpoint, {headers:{Authorization:'Bearer '+spotifyToken}});
+    if(r.status===401){spotifyToken=null;localStorage.removeItem('spotify_token');return null}
+    return await r.json();
+  }catch(e){return null}
+}
+
+// Country to Spotify market code + playlist search
+const SPOTIFY_MARKETS = {
+  tokyo:'JP',seoul:'KR',shanghai:'CN',hongkong:'HK',taipei:'TW',mumbai:'IN',
+  bangkok:'TH',london:'GB',paris:'FR',berlin:'DE',stockholm:'SE',
+  newyork:'US',losangeles:'US',mexicocity:'MX',saopaulo:'BR',buenosaires:'AR',
+  lagos:'NG',johannesburg:'ZA',sydney:'AU'
+};
+
+async function spotifyGetTopTracks(cityId){
+  const market = SPOTIFY_MARKETS[cityId]||'US';
+  // Search for top playlists in this market
+  const result = await spotifyFetch(`/search?q=Top+50&type=playlist&market=${market}&limit=5`);
+  if(!result?.playlists?.items?.length) return null;
+  // Get first playlist's tracks
+  const pl = result.playlists.items[0];
+  const tracks = await spotifyFetch(`/playlists/${pl.id}/tracks?limit=10&market=${market}`);
+  if(!tracks?.items) return null;
+  return tracks.items.slice(0,10).map((item,i)=>({
+    rank:i+1,
+    title:item.track?.name||'?',
+    artist:item.track?.artists?.map(a=>a.name).join(', ')||'?',
+    album:item.track?.album?.name||'',
+    cover:item.track?.album?.images?.[0]?.url||'',
+    preview:item.track?.preview_url||null,
+  }));
+}
 let audio = null;
 let currentTrack = null;
 let isPlaying = false;
@@ -340,6 +443,15 @@ async function playTrack(track, cityId){
   document.querySelectorAll('.track-item').forEach(el=>{
     if(el.querySelector('.track-name')?.textContent === track.title) el.classList.add('playing');
   });
+
+  // If Spotify preview URL available, use it directly
+  if(track.preview){
+    audio = new Audio(track.preview);
+    audio.volume = document.getElementById('volume-slider').value/100;
+    audio.onended = ()=>{isPlaying=false;updatePlayBtn()};
+    document.getElementById('btn-play').textContent = '▶';
+    return;
+  }
 
   // Try iTunes API for preview
   const cmap={tokyo:'jp',seoul:'kr',shanghai:'cn',hongkong:'hk',taipei:'tw',mumbai:'in',bangkok:'th',london:'gb',paris:'fr',berlin:'de',stockholm:'se',newyork:'us',losangeles:'us',mexicocity:'mx',saopaulo:'br',buenosaires:'ar',lagos:'ng',johannesburg:'za',sydney:'au'};
@@ -412,9 +524,21 @@ function closePanel(){
 }
 window.closePanel=closePanel;
 
-function renderTracks(cid){
+async function renderTracks(cid){
   const c=document.getElementById('track-list');
   c.innerHTML='<div class="loading-dots"><span></span><span></span><span></span></div>';
+
+  // If Spotify tab + connected, fetch real data
+  if(currentPlatform==='spotify' && spotifyToken){
+    const real = await spotifyGetTopTracks(cid);
+    if(real?.length){
+      const pt=currentTrack&&currentTrack.cityId===cid;
+      c.innerHTML=real.map((t,i)=>`<div class="track-item${pt&&currentTrack&&currentTrack.title===t.title?' playing':''}" onclick="playTrack({title:'${t.title.replace(/'/g,"\\'")}',artist:'${t.artist.replace(/'/g,"\\'")}',rank:${t.rank},preview:'${t.preview||''}'},'${cid}')"><div class="track-rank ${i<3?'top3':''}">${t.rank}</div><div class="track-info"><div class="track-name">${t.title}</div><div class="track-artist">${t.artist}</div></div><div class="track-play-icon">${t.preview?'▶':'🔇'}</div></div>`).join('');
+      return;
+    }
+  }
+
+  // Fallback: mock data
   setTimeout(()=>{
     const tracks=getTracks(cid);
     const pt=currentTrack&&currentTrack.cityId===cid;
@@ -433,6 +557,23 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&panel.classList.con
 globeEl.addEventListener('pointerdown',()=>{
   if(!panel.classList.contains('open')){hintBadge.style.opacity='.15';setTimeout(()=>{if(!panel.classList.contains('open'))hintBadge.style.opacity='1'},3000)}
 });
+
+// ═══════════════ Init ═══════════════
+(async function init(){
+  // Handle Spotify callback
+  const authed = await spotifyHandleCallback();
+  if(authed || spotifyToken){
+    document.getElementById('spotify-connect').style.display='none';
+    document.getElementById('spotify-connected').style.display='flex';
+  }
+  // If was on a city before redirect, show it again
+  const lastCity = localStorage.getItem('last_city');
+  if(lastCity){
+    const city = CITIES.find(c=>c.id===lastCity);
+    if(city) selectCity(city);
+    localStorage.removeItem('last_city');
+  }
+})();
 
 }catch(err){
   document.body.innerHTML=`<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000010;color:#ff4444;font-family:monospace;padding:40px;white-space:pre-wrap">❌ ${err.message}\n\n${err.stack||''}</div>`;
