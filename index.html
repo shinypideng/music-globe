@@ -343,7 +343,7 @@ async function generateCodeChallenge(verifier){
   return btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
 }
 
-async function spotifyLogin(){
+window.spotifyLogin = async function spotifyLogin(){
   try {
   if(currentCity) localStorage.setItem('last_city', currentCity.id);
   const verifier = generateCodeVerifier();
@@ -359,8 +359,7 @@ async function spotifyLogin(){
   });
   window.location.href = 'https://accounts.spotify.com/authorize?' + params;
   } catch(e) { alert('Spotify 登录失败: ' + e.message); console.error(e); }
-}
-window.spotifyLogin = spotifyLogin;
+};
 
 async function spotifyHandleCallback(){
   const code = new URLSearchParams(window.location.search).get('code');
