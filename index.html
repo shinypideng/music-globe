@@ -96,10 +96,7 @@ body{
     <button class="panel-close-btn" onclick="closePanel()">✕</button>
   </div>
   <div class="platform-tabs" id="platform-tabs">
-    <div class="platform-tab active" data-platform="spotify">Spotify</div>
-    <div class="platform-tab" data-platform="netease">网易云</div>
-    <div class="platform-tab" data-platform="qq">QQ音乐</div>
-    <div class="platform-tab" data-platform="apple">Apple Music</div>
+    <div class="platform-tab active" data-platform="spotify">🎧 Spotify Top 50</div>
   </div>
   <div class="track-list-wrapper" id="track-list"></div>
 </div>
@@ -158,30 +155,6 @@ const CITIES = [
   {id:'johannesburg',name:'Johannesburg',nameCN:'约翰内斯堡',country:'南非',flag:'🇿🇦',lat:-26.20,lng:28.05},
   {id:'sydney',name:'Sydney',nameCN:'悉尼',country:'澳大利亚',flag:'🇦🇺',lat:-33.87,lng:151.21},
 ];
-
-// ═══════════════ 榜单 ═══════════════
-const MOCK = {
-  tokyo:{s:[['アイドル','YOASOBI'],['KICK BACK','米津玄師'],['怪獣の花唄','Vaundy'],['Overdose','なとり'],['新時代','Ado'],['Subtitle','Official髭男dism'],['W/X/Y','Tani Yuuki'],['Cry Baby','Official髭男dism'],['残響散歌','Aimer'],['ベテルギウス','優里']]},
-  seoul:{s:[['Seven','Jung Kook'],['Super Shy','NewJeans'],['Like Crazy','Jimin'],['Cupid','FIFTY FIFTY'],['OMG','NewJeans'],['Dynamite','BTS'],['Ditto','NewJeans'],['Butter','BTS'],['Pink Venom','BLACKPINK'],['Queencard','(G)I-DLE']]},
-  shanghai:{s:[['乌梅子酱','李荣浩'],['我记得','赵雷'],['向云端','黄绮珊'],['笼','张碧晨'],['孤勇者','陈奕迅'],['晴天','周杰伦'],['就让这大雨全都落下','容祖儿'],['如果呢','郑润泽'],['最好的安排','王OK'],['妈妈的话','Zyboy']]},
-  hongkong:{s:[['世一','MC 張天賦'],['隱形遊樂場','張敬軒'],['Dear My Friend,','姜濤'],['E先生連環不幸','呂爵安'],['Megahit','Anson Lo'],['到底發生過什麼事','Dear Jane'],['記憶棉','MC 張天賦'],['留一天與你喘息','陳卓賢'],['抽','MC 張天賦'],['老派約會之必要','MC 張天賦']]},
-  taipei:{s:[['想和你看五月的晚霞','陳華'],['閣愛妳一擺','茄子蛋'],['好不容易','告五人'],['在這座城市遺失了你','告五人'],['浪子回頭','茄子蛋'],['刻在我心底的名字','盧廣仲'],['愛情你比我想的閣較偉大','茄子蛋'],['Way Up','瘦子E.SO'],['Without You','高爾宣 OSN'],['醜八怪','瘦子E.SO']]},
-  mumbai:{s:[['Kesariya','Arijit Singh'],['Maan Meri Jaan','King'],['Pasoori','Ali Sethi'],['Calm Down','Rema'],['Srivalli','Javed Ali'],['Raataan Lambiyan','Jubin Nautiyal'],['Excuses','AP Dhillon'],['Mera Dil Ye Pukare','Arijit Singh'],['Arabic Kuthu','Anirudh'],['Chaand Baaliyan','Arijit Singh']]},
-  bangkok:{s:[['FLOWER','JISOO'],['MONEY','LISA'],['ลั่นทม','COCKTAIL'],['เพลงรัก','Three Man Down'],['จันทร์เอ๋ย','Tilly Birds'],['พิง','Nont Tanont'],['Whatever','Pond Ponlawit'],['รักแรก','Nont Tanont'],['ซ้อมมีแฟน','MEYOU'],['ซูลูปาก้า','LUSS']]},
-  london:{s:[['As It Was','Harry Styles'],['Flowers','Miley Cyrus'],["Boy's a Liar",'PinkPantheress'],['Escapism.','RAYE'],['Sprinter','Dave'],['Miracle','Calvin Harris'],['Anti-Hero','Taylor Swift'],['Dance The Night','Dua Lipa'],['Strangers','Kenya Grace'],['Vampire','Olivia Rodrigo']]},
-  paris:{s:[['Dernière Danse','Indila'],['Bande Organisée','Jul'],['Petit Génie','Jungeli'],['Suavemente','Soolking'],['DIE','Gazo'],['Tourner Dans Le Vide','Indila'],['Titanium','David Guetta'],['Copines','Aya Nakamura'],['Filtré','Timal'],['AJC','La Fève']]},
-  berlin:{s:[['Zukunft Pink','Peter Fox'],['Wildberry Lillet','Nina Chuba'],['Friesenjung','Ski Aggu'],['Komet','Udo Lindenberg'],['Sie weiß','AYLIVA'],['All Night','RAF Camora'],['Verliebt','Kontra K'],['Mädchen auf dem Pferd','Luca-Dante'],['Layla','DJ Robin'],['Nachts wach','Miksu']]},
-  stockholm:{s:[['Tattoo','Loreen'],["Can't Tame Her",'Zara Larsson'],['Wake Me Up','Avicii'],['Waiting For Love','Avicii'],['The Nights','Avicii'],['More Than You Know','Axwell /\\ Ingrosso'],['I Like It','Alesso'],['Lush Life','Zara Larsson'],['Habits','Tove Lo'],['On My Love','Zara Larsson']]},
-  newyork:{s:[['Paint The Town Red','Doja Cat'],['Cruel Summer','Taylor Swift'],['Kill Bill','SZA'],['Last Night','Morgan Wallen'],['Rich Flex','Drake'],['fukumean','Gunna'],['Barbie World','Nicki Minaj'],['All My Life','Lil Durk'],['Fast Car','Luke Combs'],['Calm Down','Rema']]},
-  losangeles:{s:[['Flowers','Miley Cyrus'],['Anti-Hero','Taylor Swift'],['Unholy','Sam Smith'],['Die For You','The Weeknd'],["Creepin'",'Metro Boomin'],["I'm Good",'David Guetta'],['Made You Look','Meghan Trainor'],['Lavender Haze','Taylor Swift'],['Players','Coi Leray'],['Just Wanna Rock','Lil Uzi Vert']]},
-  mexicocity:{s:[['un x100to','Grupo Frontera'],['Ella Baila Sola','Eslabon Armado'],['TQG','Karol G'],['Bebe Dame','Fuerza Regida'],['Qué Agonía','Yuridia'],['AMG','Natanael Cano'],['Shakira Bzrp 53','Bizarrap'],['Classy 101','Feid'],['La Bachata','Manuel Turizo'],['Me Porto Bonito','Bad Bunny']]},
-  saopaulo:{s:[['Leão','Marília Mendonça'],['Erro Gostoso','Simone Mendes'],['Envolver','Anitta'],['Nosso Quadro','AgroPlay'],['Bombonzinho','Israel & Rodolffo'],['Pipoco','Ana Castela'],['Acordo','Henrique & Juliano'],['Ai Papai','Anitta'],['Baladinha Rural','US Agroboy'],['Palhaça','Naiara Azevedo']]},
-  buenosaires:{s:[['Shakira Bzrp 53','Bizarrap'],['La Bachata','Manuel Turizo'],['Quevedo Bzrp 52','Bizarrap'],['TQG','Karol G'],['Me Porto Bonito','Bad Bunny'],['Hey Mor','Ozuna'],['MERCHO','LiL CaKe'],['PUNTO G','Quevedo'],['Yandel 150','Yandel'],['Marisola','Stars Music']]},
-  lagos:{s:[['Calm Down','Rema'],['Rush','Ayra Starr'],['KU LO SA','Oxlade'],['Sability','Ayra Starr'],['Soweto','Victony'],['Last Last','Burna Boy'],['Love Nwantiti','CKay'],['Peru','Fireboy DML'],['Buga','Kizz Daniel'],['Finesse','Pheelz']]},
-  johannesburg:{s:[['Water','Tyla'],['Jerusalema','Master KG'],['Imithandazo','Kabza De Small'],['Sukakude','Kelvin Momo'],['Yahyuppiyah','Uncle Waffles'],['Sofa Silahlane','Wanitwa Mos'],['Sengizwile','Kelvin Momo'],['Mnike','Tyler ICU'],['Dalie','Kamo Mphela'],['Umona','Kabza De Small']]},
-  sydney:{s:[['The Less I Know','Tame Impala'],['Riptide','Vance Joy'],['Dance Monkey','Tones and I'],['Stay','The Kid LAROI'],['Chandelier','Sia'],['Thousand Miles','The Kid LAROI'],['Feels Like…','Tame Impala'],['High','Peking Duk'],['Never Be Like You','Flume'],['Cheap Thrills','Sia']]},
-};
-function getTracks(cid,p){return (MOCK[cid]?.s||MOCK.tokyo.s).map((t,i)=>({rank:i+1,title:t[0],artist:t[1]}))}
 
 // ═══════════════ Globe ═══════════════
 const globeEl = document.getElementById('globe-container');
@@ -409,21 +382,39 @@ const SPOTIFY_MARKETS = {
 
 async function spotifyGetTopTracks(cityId){
   const market = SPOTIFY_MARKETS[cityId]||'US';
-  // Search for top playlists in this market
-  const result = await spotifyFetch(`/search?q=Top+50&type=playlist&market=${market}&limit=5`);
-  if(!result?.playlists?.items?.length) return null;
-  // Get first playlist's tracks
-  const pl = result.playlists.items[0];
-  const tracks = await spotifyFetch(`/playlists/${pl.id}/tracks?limit=10&market=${market}`);
-  if(!tracks?.items) return null;
-  return tracks.items.slice(0,10).map((item,i)=>({
-    rank:i+1,
-    title:item.track?.name||'?',
-    artist:item.track?.artists?.map(a=>a.name).join(', ')||'?',
-    album:item.track?.album?.name||'',
-    cover:item.track?.album?.images?.[0]?.url||'',
-    preview:item.track?.preview_url||null,
-  }));
+  // Try multiple search queries to find official charts
+  const queries = [
+    `Top 50 - ${market}`,
+    `Top Songs - ${market}`,
+    `Hot Hits ${getCountryName(market)}`,
+    `Today's Top Hits`,
+  ];
+  for(const q of queries){
+    const result = await spotifyFetch(`/search?q=${encodeURIComponent(q)}&type=playlist&market=${market}&limit=5`);
+    if(!result?.playlists?.items?.length) continue;
+    // Pick the playlist with most followers (likely the official one)
+    const best = result.playlists.items
+      .filter(p=>p?.tracks?.total >= 30)
+      .sort((a,b)=>(b.followers?.total||0)-(a.followers?.total||0))[0];
+    if(best){
+      const tracks = await spotifyFetch(`/playlists/${best.id}/tracks?limit=15&market=${market}`);
+      if(!tracks?.items?.length) continue;
+      return tracks.items.slice(0,12).map((item,i)=>({
+        rank:i+1,
+        title:item.track?.name||'?',
+        artist:item.track?.artists?.map(a=>a.name).join(', ')||'?',
+        cover:item.track?.album?.images?.[0]?.url||'',
+        preview:item.track?.preview_url||null,
+        spotifyUri:item.track?.uri||'',
+      }));
+    }
+  }
+  return null;
+}
+
+function getCountryName(code){
+  const m={JP:'Japan',KR:'Korea',HK:'Hong Kong',TW:'Taiwan',IN:'India',TH:'Thailand',GB:'UK',FR:'France',DE:'Germany',SE:'Sweden',US:'USA',MX:'Mexico',BR:'Brazil',AR:'Argentina',NG:'Nigeria',ZA:'South Africa',AU:'Australia',CN:'China'};
+  return m[code]||code;
 }
 let audio = null;
 let currentTrack = null;
@@ -500,7 +491,6 @@ function setVolume(v){if(audio)audio.volume=v/100}
 const panel = document.getElementById('music-panel');
 const hintBadge = document.getElementById('hint-badge');
 let currentCity = null;
-let currentPlatform = 'spotify';
 
 function selectCity(city){
   currentCity=city;
@@ -511,9 +501,6 @@ function selectCity(city){
   document.getElementById('panel-flag').textContent=city.flag;
   document.getElementById('panel-city').textContent=city.nameCN;
   document.getElementById('panel-country').textContent=city.name;
-  currentPlatform='spotify';
-  document.querySelectorAll('.platform-tab').forEach(t=>t.classList.remove('active'));
-  document.querySelector('[data-platform="spotify"]').classList.add('active');
   renderTracks(city.id);
   panel.classList.add('open');
   hintBadge.style.opacity='0';
@@ -528,33 +515,22 @@ window.closePanel=closePanel;
 
 async function renderTracks(cid){
   const c=document.getElementById('track-list');
-  c.innerHTML='<div class="loading-dots"><span></span><span></span><span></span></div>';
 
-  // If Spotify tab + connected, fetch real data
-  if(currentPlatform==='spotify' && spotifyToken){
-    const real = await spotifyGetTopTracks(cid);
-    if(real?.length){
-      const pt=currentTrack&&currentTrack.cityId===cid;
-      c.innerHTML=real.map((t,i)=>`<div class="track-item${pt&&currentTrack&&currentTrack.title===t.title?' playing':''}" onclick="playTrack({title:'${t.title.replace(/'/g,"\\'")}',artist:'${t.artist.replace(/'/g,"\\'")}',rank:${t.rank},preview:'${t.preview||''}'},'${cid}')"><div class="track-rank ${i<3?'top3':''}">${t.rank}</div><div class="track-info"><div class="track-name">${t.title}</div><div class="track-artist">${t.artist}</div></div><div class="track-play-icon">${t.preview?'▶':'🔇'}</div></div>`).join('');
-      return;
-    }
+  if(!spotifyToken){
+    c.innerHTML='<div style="padding:30px;text-align:center;color:rgba(255,255,255,.4);font-size:13px;line-height:1.8">🔒 请先连接 Spotify<br><span style="font-size:11px;color:rgba(255,255,255,.25)">点击左上角 🟢 Connect Spotify</span></div>';
+    return;
   }
 
-  // Fallback: mock data
-  setTimeout(()=>{
-    const tracks=getTracks(cid);
+  c.innerHTML='<div class="loading-dots"><span></span><span></span><span></span></div>';
+  const real = await spotifyGetTopTracks(cid);
+  if(real?.length){
     const pt=currentTrack&&currentTrack.cityId===cid;
-    c.innerHTML=tracks.map(t=>`<div class="track-item${pt&&currentTrack&&currentTrack.title===t.title?' playing':''}" onclick="playTrack({title:'${t.title.replace(/'/g,"\\'")}',artist:'${t.artist.replace(/'/g,"\\'")}',rank:${t.rank}},'${cid}')"><div class="track-rank ${t.rank<=3?'top3':''}">${t.rank}</div><div class="track-info"><div class="track-name">${t.title}</div><div class="track-artist">${t.artist}</div></div><div class="track-play-icon">▶</div></div>`).join('');
-  },200);
+    c.innerHTML=real.map((t,i)=>`<div class="track-item${pt&&currentTrack&&currentTrack.title===t.title?' playing':''}" onclick="playTrack({title:'${t.title.replace(/'/g,"\\'")}',artist:'${t.artist.replace(/'/g,"\\'")}',rank:${t.rank},preview:'${t.preview||''}'},'${cid}')"><div class="track-rank ${i<3?'top3':''}">${t.rank}</div><div class="track-info"><div class="track-name">${t.title}</div><div class="track-artist">${t.artist}</div></div><div class="track-play-icon">${t.preview?'▶':'🔇'}</div></div>`).join('');
+  } else {
+    c.innerHTML='<div style="padding:30px;text-align:center;color:rgba(255,255,255,.35);font-size:13px">😔 该地区暂未找到榜单<br><span style="font-size:11px">试试其他城市</span></div>';
+  }
 }
 
-document.getElementById('platform-tabs').addEventListener('click',e=>{
-  const tab=e.target.closest('.platform-tab');
-  if(!tab||!currentCity)return;
-  document.querySelectorAll('.platform-tab').forEach(t=>t.classList.remove('active'));
-  tab.classList.add('active');currentPlatform=tab.dataset.platform;
-  renderTracks(currentCity.id);
-});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&panel.classList.contains('open'))closePanel()});
 globeEl.addEventListener('pointerdown',()=>{
   if(!panel.classList.contains('open')){hintBadge.style.opacity='.15';setTimeout(()=>{if(!panel.classList.contains('open'))hintBadge.style.opacity='1'},3000)}
