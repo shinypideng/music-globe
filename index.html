@@ -303,8 +303,9 @@ function removeLighthouse(){
   if(lighthouseAnimId){cancelAnimationFrame(lighthouseAnimId);lighthouseAnimId=null}
 }
 
-// ═══════════════ iTunes RSS 榜单 API（无需登录） ═══════════════
-// 苹果公开 RSS 接口，返回各国最热歌曲，自带 30 秒试听 + 封面
+// ═══════════════ iTunes Search API 榜单（无需登录，支持 CORS） ═══════════════
+// RSS API 不支持 CORS，改用 Search API 搜各国热门歌曲
+// Search API 自带 30 秒试听 + 封面，且允许浏览器直接调用
 const ITUNES_COUNTRY = {
   tokyo:'jp',seoul:'kr',shanghai:'cn',hongkong:'hk',taipei:'tw',
   mumbai:'in',bangkok:'th',london:'gb',paris:'fr',berlin:'de',
@@ -312,21 +313,32 @@ const ITUNES_COUNTRY = {
   saopaulo:'br',buenosaires:'ar',lagos:'ng',johannesburg:'za',sydney:'au'
 };
 
+// 各国热门搜索词（用当地语言搜热门歌曲，效果最好）
+const ITUNES_QUERIES = {
+  tokyo:'日本 トップソング',seoul:'한국 인기곡',shanghai:'华语 热门',
+  hongkong:'粵語 熱門',taipei:'華語 熱門',mumbai:'bollywood hits',
+  bangkok:'ไทย ฮิต',london:'uk top charts',paris:'france top hits',
+  berlin:'deutschland hits',stockholm:'sverige hits',newyork:'usa top hits',
+  losangeles:'usa top hits',mexicocity:'mexico top hits',saopaulo:'brasil top hits',
+  buenosaires:'argentina top hits',lagos:'nigeria afrobeats',johannesburg:'south africa hits',
+  sydney:'australia top hits'
+};
+
 async function itunesGetTopTracks(cityId){
   const country = ITUNES_COUNTRY[cityId] || 'us';
+  const query = ITUNES_QUERIES[cityId] || 'top hits';
   try{
-    const resp = await fetch(`https://rss.applemarketingtools.com/api/v2/${country}/music/most-played/15/songs.json`);
+    const resp = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&country=${country}&limit=15&media=music&sort=popular`);
     const data = await resp.json();
-    const results = data?.feed?.results || [];
-    if(!results.length) return {error:'no_results', debug:['iTunes RSS: 0 results for '+country]};
+    const results = data?.results || [];
+    if(!results.length) return {error:'no_results', debug:['iTunes Search: 0 results for '+country+' / '+query]};
 
     return results.slice(0,12).map((r,i)=>({
       rank: i+1,
-      title: r.name || '?',
+      title: r.trackName || '?',
       artist: r.artistName || '?',
       cover: r.artworkUrl100 ? r.artworkUrl100.replace('100x100','300x300') : '',
-      preview: null,  // RSS 不含 preview，点歌时通过 iTunes Search API 补
-      appleMusicUrl: r.url || '',
+      preview: r.previewUrl || null,
     }));
   }catch(e){
     return {error:'fetch_failed', debug:['iTunes fetch error: '+e.message]};
