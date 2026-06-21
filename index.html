@@ -328,7 +328,7 @@ window.spotifyLogin = async function spotifyLogin(){
     redirect_uri: SPOTIFY_REDIRECT,
     code_challenge_method: 'S256',
     code_challenge: challenge,
-    scope: 'user-read-private',
+    scope: 'user-read-private playlist-read-private playlist-read-collaborative',
   });
   window.location.href = 'https://accounts.spotify.com/authorize?' + params;
   } catch(e) { alert('Spotify 登录失败: ' + e.message); console.error(e); }
@@ -372,71 +372,105 @@ async function spotifyFetch(endpoint){
   }catch(e){return null}
 }
 
-// Country to Spotify market code + playlist search
-const SPOTIFY_MARKETS = {
-  tokyo:'JP',seoul:'KR',shanghai:'HK',hongkong:'HK',taipei:'TW',mumbai:'IN',
-  bangkok:'TH',london:'GB',paris:'FR',berlin:'DE',stockholm:'SE',
-  newyork:'US',losangeles:'US',mexicocity:'MX',saopaulo:'BR',buenosaires:'AR',
-  lagos:'NG',johannesburg:'ZA',sydney:'AU'
+// ═══════════════ Spotify Top 50 固定歌单 ID ═══════════════
+// 每个国家的 Spotify "Top 50" 歌单有固定的 Playlist ID
+// 直接用 ID 请求，不需要搜索，最可靠
+const SPOTIFY_TOP50 = {
+  tokyo:        '37i9dQZEVXbKXQ4mDTEBXq',  // Japan Top 50
+  seoul:        '37i9dQZEVXbJ7MmmjDBkUV',  // South Korea Top 50
+  shanghai:     '37i9dQZEVXbLjqGca1MWHB',  // Hong Kong Top 50 (中国大陆无 Spotify)
+  hongkong:     '37i9dQZEVXbLjqGca1MWHB',  // Hong Kong Top 50
+  taipei:       '37i9dQZEVXbMnUQ2CEsatO',  // Taiwan Top 50
+  mumbai:       '37i9dQZEVXbLl7dUhqXmmj',  // India Top 50
+  bangkok:      '37i9dQZEVXbA1DZYJlCS55',  // Thailand Top 50
+  london:       '37i9dQZEVXbLnolsZ8PSNw',  // UK Top 50
+  paris:        '37i9dQZEVXbKfbv2gqKQZL',  // France Top 50
+  berlin:       '37i9dQZEVXbJiZcmkrIHG5',  // Germany Top 50
+  stockholm:    '37i9dQZEVXbLq52m7rlSej',  // Sweden Top 50
+  newyork:      '37i9dQZEVXbLRQDuFV5PqN',  // USA Top 50
+  losangeles:   '37i9dQZEVXbLRQDuFV5PqN',  // USA Top 50
+  mexicocity:   '37i9dQZEVXbLV2BFkCGF0r',  // Mexico Top 50
+  saopaulo:     '37i9dQZEVXbMXbN2tCjnQ8',  // Brazil Top 50
+  buenosaires:  '37i9dQZEVXbLoVHebMZUiu',  // Argentina Top 50
+  lagos:        '37i9dQZEVXbKcUBo5wAX0L',  // Nigeria Top 50
+  johannesburg: '37i9dQZEVXbK6oiPmbjJre',  // South Africa Top 50
+  sydney:       '37i9dQZEVXbJU2DZiNV1Zi',  // Australia Top 50
+};
+
+// 备选：Viral 50 歌单 ID（如果 Top 50 拿不到就用这个）
+const SPOTIFY_VIRAL50 = {
+  tokyo:'37i9dQZEVXbKkIDNWD28QC',seoul:'37i9dQZEVXbKkIDNWD28QC',
+  shanghai:'37i9dQZEVXbKkIDNWD28QC',hongkong:'37i9dQZEVXbKkIDNWD28QC',
+  taipei:'37i9dQZEVXbKkIDNWD28QC',mumbai:'37i9dQZEVXbKkIDNWD28QC',
+  bangkok:'37i9dQZEVXbKkIDNWD28QC',london:'37i9dQZEVXbKkIDNWD28QC',
+  paris:'37i9dQZEVXbKkIDNWD28QC',berlin:'37i9dQZEVXbKkIDNWD28QC',
+  stockholm:'37i9dQZEVXbKkIDNWD28QC',newyork:'37i9dQZEVXbKkIDNWD28QC',
+  losangeles:'37i9dQZEVXbKkIDNWD28QC',mexicocity:'37i9dQZEVXbKkIDNWD28QC',
+  saopaulo:'37i9dQZEVXbKkIDNWD28QC',buenosaires:'37i9dQZEVXbKkIDNWD28QC',
+  lagos:'37i9dQZEVXbKkIDNWD28QC',johannesburg:'37i9dQZEVXbKkIDNWD28QC',
+  sydney:'37i9dQZEVXbKkIDNWD28QC',
 };
 
 async function spotifyGetTopTracks(cityId){
-  const market = SPOTIFY_MARKETS[cityId]||'US';
-  const countryName = getCountryName(market);
   let debug = [];
 
-  // Strategy 1: Browse featured playlists (most reliable)
-  const featured = await spotifyFetch(`/browse/featured-playlists?country=${market}&limit=10`);
-  if(featured?.error){
-    debug.push('Browse API error: '+featured.error.message);
-    if(featured.error.status===401){spotifyToken=null;localStorage.removeItem('spotify_token');return {error:'token_expired',debug}};
+  // Step 0: 验证 token 有效
+  const me = await spotifyFetch('/me');
+  if(!me || me.error){
+    debug.push('Token 无效或已过期');
+    spotifyToken=null; localStorage.removeItem('spotify_token');
+    return {error:'token_expired', debug};
   }
-  debug.push('Browse: '+(featured?.playlists?.items?.length||0)+' playlists');
-  
-  if(featured?.playlists?.items?.length){
-    const best = featured.playlists.items
-      .filter(p => (p?.tracks?.total||0) >= 10)[0];
-    if(best){
-      debug.push('Picked: '+best.name+' ('+(best.tracks?.total||0)+' tracks)');
-      const tracks = await spotifyFetch(`/playlists/${best.id}/tracks?limit=15&market=${market}`);
-      debug.push('Tracks returned: '+(tracks?.items?.length||0));
-      if(tracks?.items?.length){
-        return tracks.items.slice(0,12).map((item,i)=>({
+  debug.push('Token OK: '+me.country+' '+me.id);
+
+  // Step 1: 直接用 Top 50 歌单 ID 请求
+  const playlistId = SPOTIFY_TOP50[cityId];
+  if(playlistId){
+    debug.push('请求 Top 50 歌单: '+playlistId);
+    const tracks = await spotifyFetch(`/playlists/${playlistId}/tracks?limit=15`);
+
+    if(tracks?.error){
+      debug.push('API error: '+tracks.error.status+' '+tracks.error.message);
+    }
+
+    if(tracks?.items?.length){
+      debug.push('成功! 拿到 '+tracks.items.length+' 首');
+      return tracks.items.slice(0,12).map((item,i)=>{
+        const t = item.track;
+        return {
           rank:i+1,
-          title:item.track?.name||'?',
-          artist:item.track?.artists?.map(a=>a.name).join(', ')||'?',
-          cover:item.track?.album?.images?.[0]?.url||'',
-          preview:item.track?.preview_url||null,
-        }));
-      }
+          title:t?.name||'?',
+          artist:t?.artists?.map(a=>a.name).join(', ')||'?',
+          cover:t?.album?.images?.[0]?.url||'',
+          preview:t?.preview_url||null,
+        };
+      });
+    } else {
+      debug.push('Top 50 歌单返回空');
     }
   }
 
-  // Strategy 2: Search
-  const queries = [`Top 50 ${countryName}`,`${countryName} Top 50`,'Top Hits'];
-  for(const q of queries){
-    const result = await spotifyFetch(`/search?q=${encodeURIComponent(q)}&type=playlist&market=${market}&limit=5`);
-    debug.push('Search "'+q+'": '+(result?.playlists?.items?.length||0)+' results');
-    if(!result?.playlists?.items?.length) continue;
-    const best = result.playlists.items[0];
-    const tracks = await spotifyFetch(`/playlists/${best.id}/tracks?limit=15&market=${market}`);
+  // Step 2: 备选 - Viral 50 歌单
+  const viralId = SPOTIFY_VIRAL50[cityId];
+  if(viralId){
+    debug.push('尝试 Viral 50 歌单: '+viralId);
+    const tracks = await spotifyFetch(`/playlists/${viralId}/tracks?limit=15`);
     if(tracks?.items?.length){
-      return tracks.items.slice(0,12).map((item,i)=>({
-        rank:i+1,
-        title:item.track?.name||'?',
-        artist:item.track?.artists?.map(a=>a.name).join(', ')||'?',
-        cover:item.track?.album?.images?.[0]?.url||'',
-        preview:item.track?.preview_url||null,
-      }));
+      debug.push('Viral 50 成功! '+tracks.items.length+' 首');
+      return tracks.items.slice(0,12).map((item,i)=>{
+        const t = item.track;
+        return {
+          rank:i+1,
+          title:t?.name||'?',
+          artist:t?.artists?.map(a=>a.name).join(', ')||'?',
+          cover:t?.album?.images?.[0]?.url||'',
+          preview:t?.preview_url||null,
+        };
+      });
     }
   }
 
   return {error:'no_results', debug};
-}
-
-function getCountryName(code){
-  const m={JP:'Japan',KR:'Korea',HK:'Hong Kong',TW:'Taiwan',IN:'India',TH:'Thailand',GB:'UK',FR:'France',DE:'Germany',SE:'Sweden',US:'USA',MX:'Mexico',BR:'Brazil',AR:'Argentina',NG:'Nigeria',ZA:'South Africa',AU:'Australia',CN:'China'};
-  return m[code]||code;
 }
 let audio = null;
 let currentTrack = null;
