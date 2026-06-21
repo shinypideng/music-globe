@@ -96,7 +96,8 @@ body{
     <button class="panel-close-btn" onclick="closePanel()">✕</button>
   </div>
   <div class="platform-tabs" id="platform-tabs">
-    <div class="platform-tab active" data-platform="spotify">🎧 Spotify Top 50</div>
+    <div class="platform-tab active" data-platform="itunes">🎵 iTunes 热门榜</div>
+    <div class="platform-tab" data-platform="spotify">🎧 Spotify Top 50</div>
   </div>
   <div class="track-list-wrapper" id="track-list"></div>
 </div>
@@ -302,6 +303,35 @@ function removeLighthouse(){
   if(lighthouseAnimId){cancelAnimationFrame(lighthouseAnimId);lighthouseAnimId=null}
 }
 
+// ═══════════════ iTunes RSS 榜单 API（无需登录） ═══════════════
+// 苹果公开 RSS 接口，返回各国最热歌曲，自带 30 秒试听 + 封面
+const ITUNES_COUNTRY = {
+  tokyo:'jp',seoul:'kr',shanghai:'cn',hongkong:'hk',taipei:'tw',
+  mumbai:'in',bangkok:'th',london:'gb',paris:'fr',berlin:'de',
+  stockholm:'se',newyork:'us',losangeles:'us',mexicocity:'mx',
+  saopaulo:'br',buenosaires:'ar',lagos:'ng',johannesburg:'za',sydney:'au'
+};
+
+async function itunesGetTopTracks(cityId){
+  const country = ITUNES_COUNTRY[cityId] || 'us';
+  try{
+    const resp = await fetch(`https://rss.applemarketingtools.com/api/v2/${country}/music/most-played/15/songs.json`);
+    const data = await resp.json();
+    const results = data?.feed?.results || [];
+    if(!results.length) return {error:'no_results', debug:['iTunes RSS: 0 results for '+country]};
+
+    return results.slice(0,12).map((r,i)=>({
+      rank: i+1,
+      title: r.name || '?',
+      artist: r.artistName || '?',
+      cover: r.artworkUrl100 ? r.artworkUrl100.replace('100x100','300x300') : '',
+      preview: r.previewUrl || null,
+    }));
+  }catch(e){
+    return {error:'fetch_failed', debug:['iTunes fetch error: '+e.message]};
+  }
+}
+
 // ═══════════════ Spotify OAuth (PKCE) ═══════════════
 const SPOTIFY_CLIENT_ID = '1f6545fb0837407cb6181f50d8a4cd71';
 const SPOTIFY_REDIRECT = 'https://shinypideng.github.io/music-globe/';
@@ -501,6 +531,12 @@ async function playTrack(track, cityId){
 
   const cover = document.getElementById('player-cover');
   cover.textContent = '🎵'; cover.style.backgroundImage='';
+  // 如果 track 自带封面，直接显示
+  if(track.cover){
+    cover.style.backgroundImage=`url(${track.cover})`;
+    cover.style.backgroundSize='cover';
+    cover.textContent='';
+  }
   document.getElementById('player-title').textContent = track.title;
   document.getElementById('player-artist').textContent = track.artist;
   document.getElementById('player-bar').classList.add('active');
@@ -512,7 +548,7 @@ async function playTrack(track, cityId){
     if(el.querySelector('.track-name')?.textContent === track.title) el.classList.add('playing');
   });
 
-  // If Spotify preview URL available, use it directly
+  // If preview URL available (iTunes RSS 或 Spotify 都自带), 直接播放
   if(track.preview){
     audio = new Audio(track.preview);
     audio.volume = document.getElementById('volume-slider').value/100;
@@ -588,9 +624,36 @@ function closePanel(){
 }
 window.closePanel=closePanel;
 
+// ═══════════════ Tab 切换 + 榜单渲染 ═══════════════
+let activePlatform = 'itunes';
+
+document.getElementById('platform-tabs').addEventListener('click', e=>{
+  const tab = e.target.closest('.platform-tab');
+  if(!tab) return;
+  document.querySelectorAll('.platform-tab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  activePlatform = tab.dataset.platform;
+  if(currentCity) renderTracks(currentCity.id);
+});
+
 async function renderTracks(cid){
   const c=document.getElementById('track-list');
 
+  // iTunes 模式：不需要登录，直接拉
+  if(activePlatform === 'itunes'){
+    c.innerHTML='<div class="loading-dots"><span></span><span></span><span></span></div>';
+    const tracks = await itunesGetTopTracks(cid);
+    if(Array.isArray(tracks) && tracks.length){
+      const pt=currentTrack&&currentTrack.cityId===cid;
+      c.innerHTML=tracks.map((t,i)=>`<div class="track-item${pt&&currentTrack&&currentTrack.title===t.title?' playing':''}" onclick="playTrack({title:'${t.title.replace(/'/g,"\\'")}',artist:'${t.artist.replace(/'/g,"\\'")}',rank:${t.rank},preview:'${t.preview||''}',cover:'${t.cover||''}'},'${cid}')"><div class="track-rank ${i<3?'top3':''}">${t.rank}</div><div class="track-info"><div class="track-name">${t.title}</div><div class="track-artist">${t.artist}</div></div><div class="track-play-icon">${t.preview?'▶':'🔇'}</div></div>`).join('');
+    } else {
+      const debug = tracks?.debug?.join('<br>') || '';
+      c.innerHTML=`<div style="padding:20px;text-align:center;color:rgba(255,255,255,.4);font-size:13px;line-height:1.8">暂无榜单数据<br><span style="font-size:11px;color:rgba(255,255,255,.25)">${debug||''}</span></div>`;
+    }
+    return;
+  }
+
+  // Spotify 模式：需要登录
   if(!spotifyToken){
     c.innerHTML='<div style="padding:30px;text-align:center;color:rgba(255,255,255,.4);font-size:13px;line-height:1.8">🔒 Spotify 未连接<br><span style="font-size:12px;cursor:pointer;color:#1ed760;text-decoration:underline" onclick="spotifyLogin()">点击连接 Spotify</span></div>';
     return;
@@ -600,9 +663,9 @@ async function renderTracks(cid){
   const real = await spotifyGetTopTracks(cid);
   if(Array.isArray(real) && real.length){
     const pt=currentTrack&&currentTrack.cityId===cid;
-    c.innerHTML=real.map((t,i)=>`<div class="track-item${pt&&currentTrack&&currentTrack.title===t.title?' playing':''}" onclick="playTrack({title:'${t.title.replace(/'/g,"\\'")}',artist:'${t.artist.replace(/'/g,"\\'")}',rank:${t.rank},preview:'${t.preview||''}'},'${cid}')"><div class="track-rank ${i<3?'top3':''}">${t.rank}</div><div class="track-info"><div class="track-name">${t.title}</div><div class="track-artist">${t.artist}</div></div><div class="track-play-icon">${t.preview?'▶':'🔇'}</div></div>`).join('');
+    c.innerHTML=real.map((t,i)=>`<div class="track-item${pt&&currentTrack&&currentTrack.title===t.title?' playing':''}" onclick="playTrack({title:'${t.title.replace(/'/g,"\\'")}',artist:'${t.artist.replace(/'/g,"\\'")}',rank:${t.rank},preview:'${t.preview||''}',cover:'${t.cover||''}'},'${cid}')"><div class="track-rank ${i<3?'top3':''}">${t.rank}</div><div class="track-info"><div class="track-name">${t.title}</div><div class="track-artist">${t.artist}</div></div><div class="track-play-icon">${t.preview?'▶':'🔇'}</div></div>`).join('');
   } else if(real?.error==='token_expired'){
-    c.innerHTML='<div style="padding:30px;text-align:center;color:rgba(255,255,255,.4);font-size:13px;line-height:1.8">🔒 Token 已过期<br><span style="font-size:11px;cursor:pointer;color:#1ed760;text-decoration:underline" onclick="spotifyLogin()">点击重新连接 Spotify</span></div>';
+    c.innerHTML='<div style="padding:30px;text-align:center;color:rgba(255,255,255,.4);font-size:13px;line-height:1.8">🔒 Token 已过期<br><span style="font-size:12px;cursor:pointer;color:#1ed760;text-decoration:underline" onclick="spotifyLogin()">点击重新连接 Spotify</span></div>';
   } else {
     const debug = real?.debug?.join('<br>') || '';
     c.innerHTML=`<div style="padding:20px;text-align:left;color:rgba(255,255,255,.5);font-size:11px;line-height:1.8;font-family:monospace">🔍 调试信息:<br>${debug||'无数据'}<br><br><span style="color:rgba(255,255,255,.25)">请截图发给我</span></div>`;
