@@ -360,14 +360,33 @@ async function spotifyHandleCallback(){
   return false;
 }
 
+// 同步左上角 Spotify 连接状态 UI
+function updateSpotifyUI(){
+  const btn = document.getElementById('spotify-connect');
+  const ok = document.getElementById('spotify-connected');
+  if(spotifyToken){
+    btn.style.display='none'; ok.style.display='flex';
+  }else{
+    btn.style.display='flex'; ok.style.display='none';
+  }
+}
+
+// 清除 token 并同步 UI（所有 token 失效的地方都调这个）
+function clearSpotifyToken(){
+  spotifyToken=null;
+  localStorage.removeItem('spotify_token');
+  localStorage.removeItem('spotify_expires');
+  updateSpotifyUI();
+}
+
 async function spotifyFetch(endpoint){
   if(!spotifyToken) return null;
   // Check expiry
   const exp = localStorage.getItem('spotify_expires');
-  if(exp && Date.now() > parseInt(exp)){ spotifyToken=null; localStorage.removeItem('spotify_token'); return null; }
+  if(exp && Date.now() > parseInt(exp)){ clearSpotifyToken(); return null; }
   try{
     const r = await fetch('https://api.spotify.com/v1'+endpoint, {headers:{Authorization:'Bearer '+spotifyToken}});
-    if(r.status===401){spotifyToken=null;localStorage.removeItem('spotify_token');return null}
+    if(r.status===401){ clearSpotifyToken(); return null; }
     return await r.json();
   }catch(e){return null}
 }
@@ -418,7 +437,7 @@ async function spotifyGetTopTracks(cityId){
   const me = await spotifyFetch('/me');
   if(!me || me.error){
     debug.push('Token 无效或已过期');
-    spotifyToken=null; localStorage.removeItem('spotify_token');
+    clearSpotifyToken();
     return {error:'token_expired', debug};
   }
   debug.push('Token OK: '+me.country+' '+me.id);
@@ -573,7 +592,7 @@ async function renderTracks(cid){
   const c=document.getElementById('track-list');
 
   if(!spotifyToken){
-    c.innerHTML='<div style="padding:30px;text-align:center;color:rgba(255,255,255,.4);font-size:13px;line-height:1.8">🔒 请先连接 Spotify<br><span style="font-size:11px;color:rgba(255,255,255,.25)">点击左上角 🟢 Connect Spotify</span></div>';
+    c.innerHTML='<div style="padding:30px;text-align:center;color:rgba(255,255,255,.4);font-size:13px;line-height:1.8">🔒 Spotify 未连接<br><span style="font-size:12px;cursor:pointer;color:#1ed760;text-decoration:underline" onclick="spotifyLogin()">点击连接 Spotify</span></div>';
     return;
   }
 
@@ -599,10 +618,7 @@ globeEl.addEventListener('pointerdown',()=>{
 (async function init(){
   // Handle Spotify callback
   const authed = await spotifyHandleCallback();
-  if(authed || spotifyToken){
-    document.getElementById('spotify-connect').style.display='none';
-    document.getElementById('spotify-connected').style.display='flex';
-  }
+  updateSpotifyUI();
   // If was on a city before redirect, show it again
   const lastCity = localStorage.getItem('last_city');
   if(lastCity){
