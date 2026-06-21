@@ -325,7 +325,8 @@ async function itunesGetTopTracks(cityId){
       title: r.name || '?',
       artist: r.artistName || '?',
       cover: r.artworkUrl100 ? r.artworkUrl100.replace('100x100','300x300') : '',
-      preview: r.previewUrl || null,
+      preview: null,  // RSS 不含 preview，点歌时通过 iTunes Search API 补
+      appleMusicUrl: r.url || '',
     }));
   }catch(e){
     return {error:'fetch_failed', debug:['iTunes fetch error: '+e.message]};
